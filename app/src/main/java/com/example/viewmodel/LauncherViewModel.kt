@@ -32,6 +32,10 @@ import java.util.UUID
 
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val preferences = application.getSharedPreferences("launcher_preferences", Context.MODE_PRIVATE)
+    private val hiddenAppIds = preferences.getStringSet("hidden_app_ids", emptySet())
+        ?.toMutableSet() ?: mutableSetOf()
+
     val statusMonitor = SystemStatusMonitor(application)
     val controlsManager = SystemControlsManager(application)
 
@@ -62,17 +66,18 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val _recentApps = MutableStateFlow<List<AppItem>>(emptyList())
     val recentApps: StateFlow<List<AppItem>> = _recentApps.asStateFlow()
 
-    private val _assistiveTouchEnabled = MutableStateFlow(true)
+    private val _assistiveTouchEnabled = MutableStateFlow(preferences.getBoolean("assistive_touch_enabled", true))
     val assistiveTouchEnabled: StateFlow<Boolean> = _assistiveTouchEnabled.asStateFlow()
 
-    private val _showIOSStatusBar = MutableStateFlow(true)
+    private val _showIOSStatusBar = MutableStateFlow(preferences.getBoolean("show_ios_status_bar", true))
     val showIOSStatusBar: StateFlow<Boolean> = _showIOSStatusBar.asStateFlow()
 
-    private val _selectedWallpaperResId = MutableStateFlow(R.drawable.wallpaper_ios10_wave)
+    private val _selectedWallpaperResId = MutableStateFlow(preferences.getInt("wallpaper_res_id", R.drawable.wallpaper_ios10_wave))
     val selectedWallpaperResId: StateFlow<Int> = _selectedWallpaperResId.asStateFlow()
 
     fun setShowIOSStatusBar(enabled: Boolean) {
         _showIOSStatusBar.value = enabled
+        preferences.edit().putBoolean("show_ios_status_bar", enabled).apply()
     }
 
     // Cache of loaded app icon bitmaps
@@ -125,7 +130,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             _installedApps.value = rawApps
 
             // Load saved layout or generate default
-            loadSavedLayout(rawApps)
+            loadSavedLayout(rawApps.filterNot { it.id in hiddenAppIds })
         }
     }
 
@@ -378,11 +383,18 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleAssistiveTouch() {
-        _assistiveTouchEnabled.value = !_assistiveTouchEnabled.value
+        val enabled = !_assistiveTouchEnabled.value
+        _assistiveTouchEnabled.value = enabled
+        preferences.edit().putBoolean("assistive_touch_enabled", enabled).apply()
     }
 
     fun setWallpaper(resId: Int) {
         _selectedWallpaperResId.value = resId
+        preferences.edit().putInt("wallpaper_res_id", resId).apply()
+    }
+
+    fun dismissRecentApp(app: AppItem) {
+        _recentApps.value = _recentApps.value.filterNot { it.id == app.id }
     }
 
     fun createFolder(source: AppItem, target: AppItem, pageIndex: Int) {
@@ -448,14 +460,28 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun removeAppFromGrid(app: AppItem) {
-        val currentPages = _pages.value.map { it.toMutableList() }.toMutableList()
-        for (page in currentPages) {
-            if (page.removeAll { it.id == app.id }) {
-                _pages.value = currentPages
-                saveLayout()
-                return
+        if (app.isFolder) return
+
+        val currentPages = _pages.value.map { page ->
+            page.mapNotNull { item ->
+                when {
+                    item.id == app.id -> null
+                    item.isFolder && item.folderApps.any { it.id == app.id } -> {
+                        val remaining = item.folderApps.filterNot { it.id == app.id }
+                        if (remaining.isEmpty()) null
+                        else if (remaining.size == 1) remaining.first()
+                        else item.copy(folderApps = remaining)
+                    }
+                    else -> item
+                }
             }
         }
+
+        _dockApps.value = _dockApps.value.filterNot { it.id == app.id }
+        _pages.value = if (currentPages.isEmpty()) listOf(emptyList()) else currentPages
+        hiddenAppIds.add(app.id)
+        preferences.edit().putStringSet("hidden_app_ids", hiddenAppIds.toSet()).apply()
+        saveLayout()
     }
 
     private fun drawableToBitmap(drawable: Drawable): Bitmap {
