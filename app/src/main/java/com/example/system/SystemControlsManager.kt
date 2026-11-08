@@ -194,11 +194,31 @@ class SystemControlsManager(private val context: Context) {
 
     fun toggleRotationLock() {
         try {
-            val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (!Settings.System.canWrite(context)) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                    Uri.parse("package:" + context.packageName)
+                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                context.startActivity(intent)
+                return
             }
-            context.startActivity(intent)
+            val currentlyAutoRotate = Settings.System.getInt(
+                context.contentResolver,
+                Settings.System.ACCELEROMETER_ROTATION,
+                1
+            ) == 1
+            Settings.System.putInt(
+                context.contentResolver,
+                Settings.System.ACCELEROMETER_ROTATION,
+                if (currentlyAutoRotate) 0 else 1
+            )
+            _isRotationLocked.value = currentlyAutoRotate
         } catch (_: Exception) {
+            try {
+                context.startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            } catch (_: Exception) {}
         }
     }
 
@@ -236,11 +256,28 @@ class SystemControlsManager(private val context: Context) {
     }
 
     fun toggleDnd() {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            ?: return
         try {
-            val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (!manager.isNotificationPolicyAccessGranted) {
+                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+                return
             }
-            context.startActivity(intent)
+            val target = if (_isDndActive.value) {
+                NotificationManager.INTERRUPTION_FILTER_ALL
+            } else {
+                NotificationManager.INTERRUPTION_FILTER_PRIORITY
+            }
+            manager.setInterruptionFilter(target)
+            _isDndActive.value = target != NotificationManager.INTERRUPTION_FILTER_ALL
+        } catch (_: SecurityException) {
+            try {
+                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            } catch (_: Exception) {}
         } catch (_: Exception) {
         }
     }
