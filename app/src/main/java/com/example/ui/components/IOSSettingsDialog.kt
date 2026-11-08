@@ -137,7 +137,12 @@ fun IOSSettingsDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White)
+                    .liquidGlassSurface(
+                    shape = RoundedCornerShape(12.dp),
+                    backgroundColor = Color(0xE8FFFFFF),
+                    elevation = 2.dp,
+                    borderWidth = 0.7.dp
+                )
             ) {
                 SettingsRowAction(
                     icon = Icons.Default.Home,
