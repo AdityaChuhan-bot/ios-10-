@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">iOS 10</string>
+    <string name="launcher_description">iPhone 6 iOS 10 Launcher</string>
+    <string name="notification_service_label">iOS 10 Notification Service</string>
+    <string name="search_hint">Search</string>
+    <string name="control_center_airplane">Airplane Mode</string>
+    <string name="control_center_wifi">Wi-Fi</string>
+    <string name="control_center_bluetooth">Bluetooth</string>
+    <string name="control_center_dnd">Do Not Disturb</string>
+    <string name="control_center_rotation">Orientation Lock</string>
+    <string name="control_center_flashlight">Flashlight</string>
+    <string name="control_center_calculator">Calculator</string>
+    <string name="control_center_camera">Camera</string>
+    <string name="control_center_timer">Timer</string>
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_empty">No Recent Notifications</string>
+    <string name="clear_all">Clear All</string>
+    <string name="assistive_touch">AssistiveTouch</string>
+    <string name="folder_default_name">Folder</string>
+    <string name="dock_label">Dock</string>
+</resources>

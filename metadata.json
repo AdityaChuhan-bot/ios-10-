@@ -1,0 +1,6 @@
+{
+  "name": "iOS 10",
+  "description": "Faithful iPhone 6 iOS 10 Launcher for Android with Home Screen, Control Center, Notification Center, Spotlight, and AssistiveTouch",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
