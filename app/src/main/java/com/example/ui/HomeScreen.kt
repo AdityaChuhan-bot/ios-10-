@@ -41,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -48,6 +49,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -107,6 +110,9 @@ fun HomeScreen(
 
     // Track selected app for folder grouping in edit mode
     var appToMerge by remember { mutableStateOf<AppItem?>(null) }
+    val appBounds = remember { mutableStateMapOf<String, Rect>() }
+    var draggedApp by remember { mutableStateOf<AppItem?>(null) }
+    var dragDelta by remember { mutableStateOf(Offset.Zero) }
 
     // Synchronize currentPage
     LaunchedEffect(pagerState.currentPage) {
@@ -308,6 +314,36 @@ fun HomeScreen(
                                 onDeleteClick = {
                                     viewModel.statusMonitor.performHapticClick()
                                     viewModel.removeAppFromGrid(app)
+                                },
+                                onPositioned = { bounds -> appBounds[app.id] = bounds },
+                                onDragStart = {
+                                    draggedApp = app
+                                    dragDelta = Offset.Zero
+                                    appToMerge = null
+                                },
+                                onDrag = { delta -> dragDelta += delta },
+                                onDragEnd = {
+                                    val source = draggedApp
+                                    val sourceBounds = source?.let { appBounds[it.id] }
+                                    if (source != null && sourceBounds != null) {
+                                        val dropPoint = Offset(
+                                            sourceBounds.center.x + dragDelta.x,
+                                            sourceBounds.center.y + dragDelta.y
+                                        )
+                                        val targetId = appBounds.entries.firstOrNull { entry ->
+                                            entry.key != source.id && entry.value.contains(dropPoint)
+                                        }?.key
+                                        val target = pageApps.firstOrNull { it.id == targetId }
+                                        if (target != null) {
+                                            viewModel.moveApp(source, target, appPageIndex)
+                                        }
+                                    }
+                                    draggedApp = null
+                                    dragDelta = Offset.Zero
+                                },
+                                onDragCancel = {
+                                    draggedApp = null
+                                    dragDelta = Offset.Zero
                                 }
                             )
                         }
