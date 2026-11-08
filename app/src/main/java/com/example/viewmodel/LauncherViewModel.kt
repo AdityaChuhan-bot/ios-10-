@@ -129,6 +129,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             rawApps.sortBy { it.label.lowercase() }
             _installedApps.value = rawApps
 
+            // Restore launcher-managed recents; Android does not expose the full system task stack to ordinary launchers.
+            val appsById = rawApps.associateBy { it.id }
+            val recentIds = preferences.getStringSet("recent_app_ids", emptySet()).orEmpty()
+            _recentApps.value = recentIds.mapNotNull { appsById[it] }.take(12)
+
             // Load saved layout or generate default
             loadSavedLayout(rawApps.filterNot { it.id in hiddenAppIds })
         }
@@ -342,6 +347,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val updatedRecents = (_recentApps.value.filter { it.id != app.id }).toMutableList()
         updatedRecents.add(0, app)
         _recentApps.value = updatedRecents.take(12)
+        preferences.edit().putStringSet("recent_app_ids", _recentApps.value.map { it.id }.toSet()).apply()
 
         // Close any active overlay
         _activeOverlay.value = ActiveOverlay.NONE
@@ -396,6 +402,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun dismissRecentApp(app: AppItem) {
         _recentApps.value = _recentApps.value.filterNot { it.id == app.id }
+        preferences.edit().putStringSet("recent_app_ids", _recentApps.value.map { it.id }.toSet()).apply()
     }
 
     /**
