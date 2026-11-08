@@ -405,6 +405,47 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         preferences.edit().putStringSet("recent_app_ids", _recentApps.value.map { it.id }.toSet()).apply()
     }
 
+    fun reorderDockApps(source: AppItem, target: AppItem) {
+        val dock = _dockApps.value.toMutableList()
+        val sourceIndex = dock.indexOfFirst { it.id == source.id }
+        val targetIndex = dock.indexOfFirst { it.id == target.id }
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex == targetIndex) return
+        dock[sourceIndex] = target
+        dock[targetIndex] = source
+        _dockApps.value = dock
+        saveLayout()
+    }
+
+    fun moveAppToDock(source: AppItem, dockTarget: AppItem, pageIndex: Int) {
+        val currentPages = _pages.value.map { it.toMutableList() }.toMutableList()
+        if (pageIndex !in currentPages.indices) return
+        val page = currentPages[pageIndex]
+        val sourceIndex = page.indexOfFirst { it.id == source.id }
+        val dock = _dockApps.value.toMutableList()
+        val dockIndex = dock.indexOfFirst { it.id == dockTarget.id }
+        if (sourceIndex < 0 || dockIndex < 0) return
+        page[sourceIndex] = dockTarget
+        dock[dockIndex] = source
+        _pages.value = currentPages
+        _dockApps.value = dock
+        saveLayout()
+    }
+
+    fun moveDockAppToPage(dockSource: AppItem, pageTarget: AppItem, pageIndex: Int) {
+        val currentPages = _pages.value.map { it.toMutableList() }.toMutableList()
+        if (pageIndex !in currentPages.indices) return
+        val page = currentPages[pageIndex]
+        val pageIndexOfTarget = page.indexOfFirst { it.id == pageTarget.id }
+        val dock = _dockApps.value.toMutableList()
+        val dockIndex = dock.indexOfFirst { it.id == dockSource.id }
+        if (pageIndexOfTarget < 0 || dockIndex < 0) return
+        dock[dockIndex] = pageTarget
+        page[pageIndexOfTarget] = dockSource
+        _pages.value = currentPages
+        _dockApps.value = dock
+        saveLayout()
+    }
+
     /**
      * Reorders two icons on the same home-screen page. Dropping onto a folder
      * moves the dragged app into that folder; dropping onto an app swaps slots.
