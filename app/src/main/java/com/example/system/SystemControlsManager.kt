@@ -202,6 +202,39 @@ class SystemControlsManager(private val context: Context) {
         }
     }
 
+    fun openCastSettings() {
+        try {
+            context.startActivity(Intent(Settings.ACTION_CAST_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (_: Exception) {
+            try {
+                context.startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun openNightLightSettings() {
+        val action = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Settings.ACTION_NIGHT_DISPLAY_SETTINGS
+        } else {
+            Settings.ACTION_DISPLAY_SETTINGS
+        }
+        try {
+            context.startActivity(Intent(action).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (_: Exception) {
+            try {
+                context.startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            } catch (_: Exception) {}
+        }
+    }
+
     fun toggleDnd() {
         try {
             val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
