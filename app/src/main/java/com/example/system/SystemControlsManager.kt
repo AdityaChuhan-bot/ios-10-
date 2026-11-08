@@ -32,10 +32,10 @@ class SystemControlsManager(private val context: Context) {
     private val _brightnessLevel = MutableStateFlow(0.7f)
     val brightnessLevel: StateFlow<Float> = _brightnessLevel.asStateFlow()
 
-    private val _isWifiOn = MutableStateFlow(true)
+    private val _isWifiOn = MutableStateFlow(false)
     val isWifiOn: StateFlow<Boolean> = _isWifiOn.asStateFlow()
 
-    private val _isBluetoothOn = MutableStateFlow(true)
+    private val _isBluetoothOn = MutableStateFlow(false)
     val isBluetoothOn: StateFlow<Boolean> = _isBluetoothOn.asStateFlow()
 
     private val _isAirplaneMode = MutableStateFlow(false)
