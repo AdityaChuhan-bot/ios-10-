@@ -10,19 +10,37 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
+import android.provider.Settings
 import android.telephony.TelephonyManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class SystemStatusMonitor(private val context: Context) {
+/**
+ * Observes device status for the launcher.
+ *
+ * All callbacks are registered once and released by [cleanup]. The clock job is
+ * owned by this monitor (rather than an unbounded, detached Main scope).
+ */
+class SystemStatusMonitor(context: Context) {
+
+    private val appContext = context.applicationContext
+    private val connectivityManager =
+        appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var isCleanedUp = false
+    private var receiverRegistered = false
+    private var networkCallbackRegistered = false
 
     private val _batteryLevel = MutableStateFlow(100)
     val batteryLevel: StateFlow<Int> = _batteryLevel.asStateFlow()
@@ -30,16 +48,16 @@ class SystemStatusMonitor(private val context: Context) {
     private val _isCharging = MutableStateFlow(false)
     val isCharging: StateFlow<Boolean> = _isCharging.asStateFlow()
 
-    private val _wifiConnected = MutableStateFlow(true)
+    private val _wifiConnected = MutableStateFlow(false)
     val wifiConnected: StateFlow<Boolean> = _wifiConnected.asStateFlow()
 
-    private val _wifiLevel = MutableStateFlow(3) // 0 to 3 bars
+    private val _wifiLevel = MutableStateFlow(0)
     val wifiLevel: StateFlow<Int> = _wifiLevel.asStateFlow()
 
-    private val _carrierName = MutableStateFlow("Carrier")
+    private val _carrierName = MutableStateFlow("Cellular")
     val carrierName: StateFlow<String> = _carrierName.asStateFlow()
 
-    private val _cellularDots = MutableStateFlow(4) // 0 to 5 dots (iOS 10 iconic 5-dot signal)
+    private val _cellularDots = MutableStateFlow(0)
     val cellularDots: StateFlow<Int> = _cellularDots.asStateFlow()
 
     private val _currentTime = MutableStateFlow("")
@@ -48,7 +66,9 @@ class SystemStatusMonitor(private val context: Context) {
     private val _currentDate = MutableStateFlow("")
     val currentDate: StateFlow<String> = _currentDate.asStateFlow()
 
-    private val _is24Hour = MutableStateFlow(false)
+    private val _is24Hour = MutableStateFlow(
+        Settings.System.getString(appContext.contentResolver, Settings.System.TIME_12_24) == "24"
+    )
     val is24Hour: StateFlow<Boolean> = _is24Hour.asStateFlow()
 
     private val _secondAngle = MutableStateFlow(0f)
@@ -60,33 +80,62 @@ class SystemStatusMonitor(private val context: Context) {
     private val _hourAngle = MutableStateFlow(0f)
     val hourAngle: StateFlow<Float> = _hourAngle.asStateFlow()
 
-    private val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+    private val vibrator =
+        appContext.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
 
-    private val scope = CoroutineScope(Dispatchers.Main)
-
-    private val batteryReceiver = object : BroadcastReceiver() {
+    private val deviceStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
-            intent?.let { updateBattery(it) }
+            when (intent?.action) {
+                Intent.ACTION_BATTERY_CHANGED -> intent.let(::updateBattery)
+                Intent.ACTION_TIME_CHANGED,
+                Intent.ACTION_TIMEZONE_CHANGED,
+                Intent.ACTION_DATE_CHANGED,
+                Intent.ACTION_LOCALE_CHANGED -> updateTime()
+            }
         }
     }
 
-    init {
-        // Register battery receiver
-        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        val initialBattery = context.registerReceiver(batteryReceiver, filter)
-        initialBattery?.let { updateBattery(it) }
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) = refreshNetwork()
+        override fun onLost(network: Network) = refreshNetwork()
+        override fun onCapabilitiesChanged(
+            network: Network,
+            networkCapabilities: NetworkCapabilities
+        ) = refreshNetwork()
+    }
 
-        // Start time ticker
-        scope.launch {
-            while (true) {
-                updateTime()
-                delay(1000)
-            }
+    init {
+        val stateFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+            addAction(Intent.ACTION_DATE_CHANGED)
+            addAction(Intent.ACTION_LOCALE_CHANGED)
         }
 
-        // Monitor Network
-        checkNetwork()
+        // ACTION_BATTERY_CHANGED is sticky: the returned intent supplies the
+        // initial state without waiting for the next battery transition.
+        val initialBattery = appContext.registerReceiver(deviceStateReceiver, stateFilter)
+        receiverRegistered = true
+        initialBattery?.let(::updateBattery)
+
+        refreshNetwork()
         updateCarrier()
+        updateTime()
+
+        try {
+            connectivityManager?.registerDefaultNetworkCallback(networkCallback)
+            networkCallbackRegistered = connectivityManager != null
+        } catch (_: Exception) {
+            // Keep the last known network state if the platform rejects callback registration.
+        }
+
+        scope.launch {
+            while (isActive) {
+                updateTime()
+                delay(1_000L)
+            }
+        }
     }
 
     fun set24HourFormat(enable: Boolean) {
@@ -98,81 +147,124 @@ class SystemStatusMonitor(private val context: Context) {
         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
         if (level >= 0 && scale > 0) {
-            _batteryLevel.value = ((level.toFloat() / scale.toFloat()) * 100).toInt()
+            _batteryLevel.value = ((level.toFloat() / scale.toFloat()) * 100f)
+                .toInt()
+                .coerceIn(0, 100)
         }
+
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
         _isCharging.value = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == BatteryManager.BATTERY_STATUS_FULL
+            status == BatteryManager.BATTERY_STATUS_FULL
     }
 
     private fun updateTime() {
         val now = Date()
         val timePattern = if (_is24Hour.value) "HH:mm" else "h:mm"
-        val timeFormat = SimpleDateFormat(timePattern, Locale.getDefault())
-        _currentTime.value = timeFormat.format(now)
+        _currentTime.value = SimpleDateFormat(timePattern, Locale.getDefault()).format(now)
+        _currentDate.value =
+            SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(now)
 
-        val datePattern = "EEEE, MMMM d"
-        val dateFormat = SimpleDateFormat(datePattern, Locale.getDefault())
-        _currentDate.value = dateFormat.format(now)
+        val calendar = java.util.Calendar.getInstance()
+        val seconds = calendar.get(java.util.Calendar.SECOND)
+        val minutes = calendar.get(java.util.Calendar.MINUTE)
+        val hours = calendar.get(java.util.Calendar.HOUR)
 
-        val cal = java.util.Calendar.getInstance()
-        val sec = cal.get(java.util.Calendar.SECOND)
-        val min = cal.get(java.util.Calendar.MINUTE)
-        val hr = cal.get(java.util.Calendar.HOUR)
-
-        _secondAngle.value = sec * 6f
-        _minuteAngle.value = min * 6f + (sec / 60f) * 6f
-        _hourAngle.value = hr * 30f + (min / 60f) * 30f
+        _secondAngle.value = seconds * 6f
+        _minuteAngle.value = minutes * 6f + seconds / 10f
+        _hourAngle.value = hours * 30f + minutes / 2f
     }
 
     fun performHapticClick() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator?.vibrate(android.os.VibrationEffect.createOneShot(15, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                vibrator?.vibrate(
+                    android.os.VibrationEffect.createOneShot(
+                        15L,
+                        android.os.VibrationEffect.DEFAULT_AMPLITUDE
+                    )
+                )
             } else {
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(15)
+                vibrator?.vibrate(15L)
             }
         } catch (_: Exception) {
         }
     }
 
-    private fun checkNetwork() {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        if (cm != null) {
-            val net = cm.activeNetwork
-            val caps = cm.getNetworkCapabilities(net)
-            if (caps != null) {
-                val hasWifi = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                val hasCell = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-                _wifiConnected.value = hasWifi
-                if (hasWifi) {
-                    val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-                    val rssi = wm?.connectionInfo?.rssi ?: -60
-                    _wifiLevel.value = WifiManager.calculateSignalLevel(rssi, 4).coerceIn(1, 3)
-                }
-                _cellularDots.value = if (hasCell || hasWifi) 4 else 2
-            } else {
-                _wifiConnected.value = false
-                _cellularDots.value = 1
+    private fun refreshNetwork() {
+        val manager = connectivityManager ?: run {
+            _wifiConnected.value = false
+            _wifiLevel.value = 0
+            _cellularDots.value = 0
+            return
+        }
+
+        try {
+            val network = manager.activeNetwork
+            val capabilities = network?.let(manager::getNetworkCapabilities)
+            val hasWifi = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            val hasCellular =
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+
+            _wifiConnected.value = hasWifi
+            _cellularDots.value = when {
+                hasCellular -> 4
+                hasWifi -> 3
+                else -> 0
             }
+
+            if (hasWifi) {
+                val wifiManager =
+                    appContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                @Suppress("DEPRECATION")
+                val rssi = wifiManager?.connectionInfo?.rssi ?: -100
+                _wifiLevel.value =
+                    WifiManager.calculateSignalLevel(rssi, 4).coerceIn(0, 3)
+            } else {
+                _wifiLevel.value = 0
+            }
+        } catch (_: SecurityException) {
+            _wifiConnected.value = false
+            _wifiLevel.value = 0
+            _cellularDots.value = 0
+        } catch (_: Exception) {
+            // A transient network-service failure must not crash the launcher.
         }
     }
 
     private fun updateCarrier() {
-        val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
-        val name = tm?.networkOperatorName
-        if (!name.isNullOrBlank()) {
-            _carrierName.value = name
-        } else {
+        try {
+            val telephony =
+                appContext.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+            _carrierName.value = telephony?.networkOperatorName
+                ?.takeIf { it.isNotBlank() }
+                ?: "Cellular"
+        } catch (_: Exception) {
             _carrierName.value = "Cellular"
         }
     }
 
     fun cleanup() {
-        try {
-            context.unregisterReceiver(batteryReceiver)
-        } catch (_: Exception) {
+        if (isCleanedUp) return
+        isCleanedUp = true
+        scope.cancel()
+
+        if (receiverRegistered) {
+            try {
+                appContext.unregisterReceiver(deviceStateReceiver)
+            } catch (_: IllegalArgumentException) {
+            } finally {
+                receiverRegistered = false
+            }
+        }
+
+        if (networkCallbackRegistered) {
+            try {
+                connectivityManager?.unregisterNetworkCallback(networkCallback)
+            } catch (_: Exception) {
+            } finally {
+                networkCallbackRegistered = false
+            }
         }
     }
 }
