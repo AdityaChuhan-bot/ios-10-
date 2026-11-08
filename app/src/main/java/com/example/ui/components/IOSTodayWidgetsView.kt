@@ -309,7 +309,7 @@ fun IOSTodayWidgetsView(
 
         // Widget 4: Siri App Suggestions
         if (showSuggestionsWidget && recentApps.isNotEmpty()) {
-            TodayWidgetCard(title = "SIRI APP SUGGESTIONS", icon = Icons.Default.Search, iconColor = Color(0xFF5856D6)) {
+            TodayWidgetCard(title = "RECENT APPS", icon = Icons.Default.Search, iconColor = Color(0xFF5856D6)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceAround
