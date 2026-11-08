@@ -134,15 +134,13 @@ class SystemControlsManager(private val context: Context) {
 
     fun toggleFlashlight() {
         val target = !_isFlashlightOn.value
-        val id = cameraIdWithFlash
-        if (id != null && cameraManager != null) {
-            try {
-                cameraManager.setTorchMode(id, target)
-                _isFlashlightOn.value = target
-            } catch (_: Exception) {
-            }
-        } else {
+        val id = cameraIdWithFlash ?: return
+        val manager = cameraManager ?: return
+        try {
+            manager.setTorchMode(id, target)
             _isFlashlightOn.value = target
+        } catch (_: Exception) {
+            // Keep the last confirmed hardware state; never report a fake toggle.
         }
     }
 
