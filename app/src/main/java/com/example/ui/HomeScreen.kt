@@ -476,7 +476,7 @@ fun HomeScreen(
                 getIconBitmap = { viewModel.getIconBitmap(it) },
                 onAppClick = { viewModel.launchApp(context, it) },
                 onDismissApp = { dismissed ->
-                    // Remove from recent apps
+                    viewModel.dismissRecentApp(dismissed)
                 },
                 onDismiss = { viewModel.closeOverlay() }
             )
