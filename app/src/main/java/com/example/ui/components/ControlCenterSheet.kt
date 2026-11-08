@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.view.KeyEvent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -7,6 +9,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -72,6 +76,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,6 +94,12 @@ fun ControlCenterSheet(
     modifier: Modifier = Modifier
 ) {
     val isFlashlightOn by controlsManager.isFlashlightOn.collectAsState()
+    val context = LocalContext.current
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) controlsManager.toggleFlashlight()
+    }
     val volumeLevel by controlsManager.volumeLevel.collectAsState()
     val brightnessLevel by controlsManager.brightnessLevel.collectAsState()
     val isWifiOn by controlsManager.isWifiOn.collectAsState()
@@ -342,7 +354,17 @@ fun ControlCenterSheet(
                                     icon = Icons.Default.FlashlightOn,
                                     isActive = isFlashlightOn,
                                     activeColor = Color.White,
-                                    onClick = { controlsManager.toggleFlashlight() },
+                                    onClick = {
+                                        if (ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.CAMERA
+                                            ) == PackageManager.PERMISSION_GRANTED
+                                        ) {
+                                            controlsManager.toggleFlashlight()
+                                        } else {
+                                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                        }
+                                    },
                                     tag = "cc_flashlight"
                                 )
                                 ControlCircleToggle(
