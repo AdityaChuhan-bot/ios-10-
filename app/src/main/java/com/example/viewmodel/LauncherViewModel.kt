@@ -398,6 +398,30 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _recentApps.value = _recentApps.value.filterNot { it.id == app.id }
     }
 
+    /**
+     * Reorders two icons on the same home-screen page. Dropping onto a folder
+     * moves the dragged app into that folder; dropping onto an app swaps slots.
+     */
+    fun moveApp(source: AppItem, target: AppItem, pageIndex: Int) {
+        if (source.id == target.id) return
+        val currentPages = _pages.value.map { it.toMutableList() }.toMutableList()
+        if (pageIndex !in currentPages.indices) return
+        val page = currentPages[pageIndex]
+        val sourceIndex = page.indexOfFirst { it.id == source.id }
+        val targetIndex = page.indexOfFirst { it.id == target.id }
+        if (sourceIndex < 0 || targetIndex < 0) return
+
+        if (target.isFolder) {
+            page[targetIndex] = target.copy(folderApps = target.folderApps + source)
+            page.removeAt(sourceIndex)
+        } else {
+            page[sourceIndex] = target
+            page[targetIndex] = source
+        }
+        _pages.value = currentPages
+        saveLayout()
+    }
+
     fun createFolder(source: AppItem, target: AppItem, pageIndex: Int) {
         if (source.id == target.id) return
 
