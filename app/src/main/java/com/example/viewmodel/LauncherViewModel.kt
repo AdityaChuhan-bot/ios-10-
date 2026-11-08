@@ -369,6 +369,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _activeOverlay.value = overlay
         if (overlay == ActiveOverlay.CONTROL_CENTER) {
             controlsManager.syncVolume()
+            controlsManager.syncSystemStates()
         }
     }
 
