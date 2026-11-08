@@ -25,13 +25,22 @@ jobs:
       - name: Install Android SDK packages
         shell: bash
         run: |
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "Android SDK root: $SDK_ROOT"
+          if [ ! -d "$SDK_ROOT" ]; then
+            echo "Android SDK directory does not exist"
+            ls -la /usr/local/lib/android || true
+            exit 1
+          fi
+          find "$SDK_ROOT/cmdline-tools" -maxdepth 4 -type f -name sdkmanager -print || true
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | head -n 1)"
           if [ -z "$SDKMANAGER" ]; then
             echo "Android sdkmanager was not found under $SDK_ROOT"
+            find "$SDK_ROOT" -maxdepth 4 -type f -name sdkmanager -print || true
             exit 1
           fi
-          yes | "$SDKMANAGER" --licenses >/dev/null
+          echo "Using sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses
           "$SDKMANAGER" --install 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
 
       - name: Set up Gradle
