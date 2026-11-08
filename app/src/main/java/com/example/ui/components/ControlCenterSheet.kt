@@ -98,8 +98,6 @@ fun ControlCenterSheet(
     val isDndActive by controlsManager.isDndActive.collectAsState()
     val isPlayingMusic by controlsManager.isPlayingMusic.collectAsState()
 
-    var isNightShiftOn by remember { mutableStateOf(false) }
-    var isAirPlayActive by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { 2 })
@@ -258,26 +256,22 @@ fun ControlCenterSheet(
                                 )
                             }
 
-                            // Row 3: AirPlay & Night Shift Liquid Glass Pills
+                            // Row 3: Android equivalents for screen casting and night light.
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                // AirPlay Mirroring Pill
                                 Row(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(50.dp)
                                         .liquidGlassSurface(
                                             shape = RoundedCornerShape(16.dp),
-                                            backgroundColor = if (isAirPlayActive) Color(0xF2E1EFFF) else Color(0xE8FFFFFF),
+                                            backgroundColor = Color(0xE8FFFFFF),
                                             elevation = 5.dp,
                                             borderWidth = 1.1.dp
                                         )
-                                        .clickable {
-                                            isAirPlayActive = !isAirPlayActive
-                                            controlsManager.toggleBluetooth()
-                                        }
+                                        .clickable { controlsManager.openCastSettings() }
                                         .padding(horizontal = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -290,33 +284,30 @@ fun ControlCenterSheet(
                                     )
                                     Column {
                                         Text(
-                                            text = "AirPlay Mirroring",
+                                            text = "Screen Mirroring",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = Color.Black
                                         )
                                         Text(
-                                            text = if (isAirPlayActive) "Connected" else "Searching...",
+                                            text = "Open Cast settings",
                                             fontSize = 10.sp,
                                             color = Color(0xFF8E8E93)
                                         )
                                     }
                                 }
 
-                                // Night Shift Pill
                                 Row(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(50.dp)
                                         .liquidGlassSurface(
                                             shape = RoundedCornerShape(16.dp),
-                                            backgroundColor = if (isNightShiftOn) Color(0xFFFFF4E5) else Color(0xE8FFFFFF),
+                                            backgroundColor = Color(0xE8FFFFFF),
                                             elevation = 5.dp,
                                             borderWidth = 1.1.dp
                                         )
-                                        .clickable {
-                                            isNightShiftOn = !isNightShiftOn
-                                        }
+                                        .clickable { controlsManager.openNightLightSettings() }
                                         .padding(horizontal = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -329,13 +320,13 @@ fun ControlCenterSheet(
                                     )
                                     Column {
                                         Text(
-                                            text = "Night Shift",
+                                            text = "Night Light",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = Color.Black
                                         )
                                         Text(
-                                            text = if (isNightShiftOn) "On Until 7:00 AM" else "Off Until 7:00 AM",
+                                            text = "Display settings",
                                             fontSize = 10.sp,
                                             color = Color(0xFF8E8E93)
                                         )
