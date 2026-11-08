@@ -90,6 +90,14 @@ class SystemControlsManager(private val context: Context) {
             _isRotationLocked.value = Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 1) == 0
         } catch (_: Exception) {}
         try {
+            val brightness = Settings.System.getInt(
+                context.contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS,
+                178
+            )
+            _brightnessLevel.value = (brightness / 255f).coerceIn(0.05f, 1f)
+        } catch (_: Exception) {}
+        try {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             _isDndActive.value = manager?.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
         } catch (_: Exception) {}
