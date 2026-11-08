@@ -119,7 +119,12 @@ class SystemStatusMonitor(context: Context) {
 
         // ACTION_BATTERY_CHANGED is sticky: the returned intent supplies the
         // initial state without waiting for the next battery transition.
-        val initialBattery = appContext.registerReceiver(deviceStateReceiver, stateFilter)
+        val initialBattery = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            appContext.registerReceiver(deviceStateReceiver, stateFilter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            appContext.registerReceiver(deviceStateReceiver, stateFilter)
+        }
         receiverRegistered = true
         initialBattery?.let(::updateBattery)
 
