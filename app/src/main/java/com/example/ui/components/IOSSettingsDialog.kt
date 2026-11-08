@@ -32,6 +32,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -45,6 +48,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.example.R
 import com.example.service.IOSNotificationListenerService
 import com.example.ui.theme.liquidGlassSurface
@@ -61,7 +66,12 @@ fun IOSSettingsDialog(
     val assistiveTouchEnabled by viewModel.assistiveTouchEnabled.collectAsState()
     val showIOSStatusBar by viewModel.showIOSStatusBar.collectAsState()
     val selectedWallpaper by viewModel.selectedWallpaperResId.collectAsState()
-    val isNotificationAccessGranted = remember { IOSNotificationListenerService.isAccessGranted(context) }
+    var isNotificationAccessGranted by remember {
+        mutableStateOf(IOSNotificationListenerService.isAccessGranted(context))
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        isNotificationAccessGranted = IOSNotificationListenerService.isAccessGranted(context)
+    }
 
     Box(
         modifier = modifier
