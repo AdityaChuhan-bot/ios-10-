@@ -2,6 +2,8 @@ package com.example.system
 
 import android.content.Context
 import android.content.Intent
+import android.bluetooth.BluetoothAdapter
+import android.app.NotificationManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
@@ -66,8 +68,31 @@ class SystemControlsManager(private val context: Context) {
         } catch (_: Exception) {
         }
 
-        // Initialize volume
+        // Initialize controls from actual device state.
         syncVolume()
+        syncSystemStates()
+    }
+
+    fun syncSystemStates() {
+        try {
+            val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+            _isWifiOn.value = wifi?.isWifiEnabled == true
+        } catch (_: Exception) {}
+        try {
+            @Suppress("DEPRECATION")
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            _isBluetoothOn.value = adapter?.isEnabled == true
+        } catch (_: Exception) {}
+        try {
+            _isAirplaneMode.value = Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 1
+        } catch (_: Exception) {}
+        try {
+            _isRotationLocked.value = Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 1) == 0
+        } catch (_: Exception) {}
+        try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            _isDndActive.value = manager?.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
+        } catch (_: Exception) {}
     }
 
     fun syncVolume() {
@@ -92,16 +117,17 @@ class SystemControlsManager(private val context: Context) {
 
     fun setBrightness(ratio: Float) {
         _brightnessLevel.value = ratio.coerceIn(0.05f, 1f)
-        // If system permission granted, persist or apply
         try {
-            if (Settings.System.canWrite(context)) {
-                val value = (_brightnessLevel.value * 255).toInt().coerceIn(10, 255)
-                Settings.System.putInt(
-                    context.contentResolver,
-                    Settings.System.SCREEN_BRIGHTNESS,
-                    value
-                )
+            if (!Settings.System.canWrite(context)) {
+                val permissionIntent = Intent(
+                    Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                    Uri.parse("package:" + context.packageName)
+                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                context.startActivity(permissionIntent)
+                return
             }
+            val value = (_brightnessLevel.value * 255).toInt().coerceIn(10, 255)
+            Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, value)
         } catch (_: Exception) {
         }
     }
@@ -121,8 +147,7 @@ class SystemControlsManager(private val context: Context) {
     }
 
     fun toggleWifi() {
-        _isWifiOn.value = !_isWifiOn.value
-        // Open Wi-Fi panel / settings
+        // Android 10+ requires user-mediated Wi-Fi changes; open the system panel.
         try {
             val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 Intent(Settings.Panel.ACTION_WIFI)
@@ -140,7 +165,7 @@ class SystemControlsManager(private val context: Context) {
     }
 
     fun toggleBluetooth() {
-        _isBluetoothOn.value = !_isBluetoothOn.value
+        // Modern Android restricts direct Bluetooth toggles for ordinary apps.
         try {
             val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -151,7 +176,7 @@ class SystemControlsManager(private val context: Context) {
     }
 
     fun toggleAirplaneMode() {
-        _isAirplaneMode.value = !_isAirplaneMode.value
+        // Airplane mode is protected by the OS; open its system settings.
         try {
             val intent = Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -162,7 +187,6 @@ class SystemControlsManager(private val context: Context) {
     }
 
     fun toggleRotationLock() {
-        _isRotationLocked.value = !_isRotationLocked.value
         try {
             val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -173,7 +197,6 @@ class SystemControlsManager(private val context: Context) {
     }
 
     fun toggleDnd() {
-        _isDndActive.value = !_isDndActive.value
         try {
             val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
