@@ -429,25 +429,23 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         if (pageIndex !in currentPages.indices) return
 
         val page = currentPages[pageIndex]
-        page.remove(source)
-
+        val sourceIdx = page.indexOfFirst { it.id == source.id }
         val targetIdx = page.indexOfFirst { it.id == target.id }
-        if (targetIdx >= 0) {
-            if (target.isFolder) {
-                // Add to existing folder
-                val updatedFolder = target.copy(folderApps = target.folderApps + source)
-                page[targetIdx] = updatedFolder
-            } else {
-                // Create new folder containing both
-                val folder = AppItem(
-                    id = "folder_${UUID.randomUUID()}",
-                    label = "Folder",
-                    packageName = "",
-                    isFolder = true,
-                    folderApps = listOf(target, source)
-                )
-                page[targetIdx] = folder
-            }
+        if (sourceIdx < 0 || targetIdx < 0 || sourceIdx == targetIdx) return
+
+        if (target.isFolder) {
+            page[targetIdx] = target.copy(folderApps = target.folderApps + source)
+            page.removeAt(sourceIdx)
+        } else {
+            val folder = AppItem(
+                id = "folder_${UUID.randomUUID()}",
+                label = "Folder",
+                packageName = "",
+                isFolder = true,
+                folderApps = listOf(target, source)
+            )
+            page[targetIdx] = folder
+            page.removeAt(sourceIdx)
         }
 
         _pages.value = currentPages
