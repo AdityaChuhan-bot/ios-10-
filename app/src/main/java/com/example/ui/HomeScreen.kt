@@ -120,6 +120,33 @@ fun HomeScreen(
     var draggedApp by remember { mutableStateOf<AppItem?>(null) }
     var dragDelta by remember { mutableStateOf(Offset.Zero) }
 
+    fun finishAppDrag(pageIndex: Int) {
+        val source = draggedApp
+        val sourceBounds = source?.let { appBounds[it.id] }
+        if (source != null && sourceBounds != null) {
+            val dropPoint = Offset(
+                sourceBounds.center.x + dragDelta.x,
+                sourceBounds.center.y + dragDelta.y
+            )
+            val pageApps = pages.getOrElse(pageIndex) { emptyList() }
+            val target = (dockApps + pageApps).firstOrNull { app ->
+                app.id != source.id && appBounds[app.id]?.contains(dropPoint) == true
+            }
+            if (target != null) {
+                val sourceIsDock = dockApps.any { it.id == source.id }
+                val targetIsDock = dockApps.any { it.id == target.id }
+                when {
+                    sourceIsDock && targetIsDock -> viewModel.reorderDockApps(source, target)
+                    sourceIsDock -> viewModel.moveDockAppToPage(source, target, pageIndex)
+                    targetIsDock -> viewModel.moveAppToDock(source, target, pageIndex)
+                    else -> viewModel.moveApp(source, target, pageIndex)
+                }
+            }
+        }
+        draggedApp = null
+        dragDelta = Offset.Zero
+    }
+
     // Synchronize currentPage
     LaunchedEffect(pagerState.currentPage) {
         viewModel.setCurrentPage((pagerState.currentPage - 1).coerceAtLeast(0))
@@ -328,25 +355,7 @@ fun HomeScreen(
                                     appToMerge = null
                                 },
                                 onDrag = { delta -> dragDelta += delta },
-                                onDragEnd = {
-                                    val source = draggedApp
-                                    val sourceBounds = source?.let { appBounds[it.id] }
-                                    if (source != null && sourceBounds != null) {
-                                        val dropPoint = Offset(
-                                            sourceBounds.center.x + dragDelta.x,
-                                            sourceBounds.center.y + dragDelta.y
-                                        )
-                                        val targetId = appBounds.entries.firstOrNull { entry ->
-                                            entry.key != source.id && entry.value.contains(dropPoint)
-                                        }?.key
-                                        val target = pageApps.firstOrNull { it.id == targetId }
-                                        if (target != null) {
-                                            viewModel.moveApp(source, target, appPageIndex)
-                                        }
-                                    }
-                                    draggedApp = null
-                                    dragDelta = Offset.Zero
-                                },
+                                onDragEnd = { finishAppDrag(appPageIndex) },
                                 onDragCancel = {
                                     draggedApp = null
                                     dragDelta = Offset.Zero
@@ -410,6 +419,18 @@ fun HomeScreen(
                     onAppLongClick = {
                         viewModel.statusMonitor.performHapticClick()
                         viewModel.setEditMode(true)
+                    },
+                    onPositioned = { app, bounds -> appBounds[app.id] = bounds },
+                    onDragStart = { app ->
+                        draggedApp = app
+                        dragDelta = Offset.Zero
+                        appToMerge = null
+                    },
+                    onDrag = { delta -> dragDelta += delta },
+                    onDragEnd = { finishAppDrag((pagerState.currentPage - 1).coerceAtLeast(0)) },
+                    onDragCancel = {
+                        draggedApp = null
+                        dragDelta = Offset.Zero
                     }
                 )
             } else {
