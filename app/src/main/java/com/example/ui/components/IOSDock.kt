@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
@@ -28,6 +29,11 @@ fun IOSDock(
     getIconBitmap: (String) -> ImageBitmap?,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: () -> Unit,
+    onPositioned: (AppItem, Rect) -> Unit = { _, _ -> },
+    onDragStart: (AppItem) -> Unit = {},
+    onDrag: (Offset) -> Unit = {},
+    onDragEnd: () -> Unit = {},
+    onDragCancel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -72,7 +78,12 @@ fun IOSDock(
                     iconBitmap = getIconBitmap(app.packageName),
                     isEditMode = isEditMode,
                     onClick = { onAppClick(app) },
-                    onLongClick = onAppLongClick
+                    onLongClick = onAppLongClick,
+                    onPositioned = { bounds -> onPositioned(app, bounds) },
+                    onDragStart = { onDragStart(app) },
+                    onDrag = onDrag,
+                    onDragEnd = onDragEnd,
+                    onDragCancel = onDragCancel
                 )
             }
         }
