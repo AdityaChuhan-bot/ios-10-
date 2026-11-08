@@ -67,7 +67,11 @@ class SystemStatusMonitor(context: Context) {
     val currentDate: StateFlow<String> = _currentDate.asStateFlow()
 
     private val _is24Hour = MutableStateFlow(
-        Settings.System.getString(appContext.contentResolver, Settings.System.TIME_12_24) == "24"
+        appContext.getSharedPreferences("launcher_preferences", Context.MODE_PRIVATE)
+            .getBoolean(
+                "is_24_hour",
+                Settings.System.getString(appContext.contentResolver, Settings.System.TIME_12_24) == "24"
+            )
     )
     val is24Hour: StateFlow<Boolean> = _is24Hour.asStateFlow()
 
@@ -140,6 +144,10 @@ class SystemStatusMonitor(context: Context) {
 
     fun set24HourFormat(enable: Boolean) {
         _is24Hour.value = enable
+        appContext.getSharedPreferences("launcher_preferences", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("is_24_hour", enable)
+            .apply()
         updateTime()
     }
 
