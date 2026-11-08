@@ -100,7 +100,7 @@ fun IOSTodayWidgetsView(
         TodayWidgetCard(title = "UP NEXT", icon = Icons.Default.CalendarToday, iconColor = Color(0xFFFF3B30)) {
             Column {
                 Text(
-                    text = "No more events today",
+                    text = "Calendar integration not configured",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color.Black
@@ -122,25 +122,25 @@ fun IOSTodayWidgetsView(
             ) {
                 Column {
                     Text(
-                        text = "Current Location",
+                        text = "Weather provider not connected",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.Black
                     )
                     Text(
-                        text = "Mostly Sunny",
+                        text = "Forecast unavailable",
                         fontSize = 12.sp,
                         color = Color(0xFF8E8E93)
                     )
                     Text(
-                        text = "H: 75°  L: 56°",
+                        text = "Connect a weather source to view forecasts",
                         fontSize = 11.sp,
                         color = Color(0xFF8E8E93)
                     )
                 }
 
                 Text(
-                    text = "72°",
+                    text = "—",
                     fontSize = 38.sp,
                     fontWeight = FontWeight.Light,
                     color = Color.Black
@@ -168,7 +168,7 @@ fun IOSTodayWidgetsView(
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            text = "iPhone",
+                            text = "This device",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color.Black
@@ -220,7 +220,7 @@ fun IOSTodayWidgetsView(
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            text = "Apple Watch",
+                            text = "Wearable battery",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color.Black
@@ -232,7 +232,7 @@ fun IOSTodayWidgetsView(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "85%",
+                            text = "Unavailable",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.Black
@@ -246,7 +246,7 @@ fun IOSTodayWidgetsView(
                                 )
                                 drawRoundRect(
                                     color = Color(0xFF34C759),
-                                    size = Size(size.width * 0.85f, size.height),
+                                    size = Size(size.width * 0f, size.height),
                                     cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
                                 )
                             }
@@ -277,25 +277,6 @@ fun IOSTodayWidgetsView(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        // "Edit" pill button at bottom
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White.copy(alpha = 0.35f))
-                .clickable { onSearchClick() }
-                .padding(horizontal = 24.dp, vertical = 8.dp)
-                .testTag("today_edit_widgets_button"),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Edit",
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
 
         Spacer(modifier = Modifier.height(24.dp))
     }
