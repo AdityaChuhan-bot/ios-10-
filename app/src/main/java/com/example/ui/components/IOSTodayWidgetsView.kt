@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,11 +25,17 @@ import androidx.compose.material.icons.filled.PhoneIphone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Watch
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +45,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,6 +65,23 @@ fun IOSTodayWidgetsView(
     val currentDate by statusMonitor.currentDate.collectAsState()
     val batteryLevel by statusMonitor.batteryLevel.collectAsState()
     val isCharging by statusMonitor.isCharging.collectAsState()
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("launcher_preferences", Context.MODE_PRIVATE)
+    }
+    var showCalendarWidget by remember {
+        mutableStateOf(preferences.getBoolean("today_widget_calendar", true))
+    }
+    var showWeatherWidget by remember {
+        mutableStateOf(preferences.getBoolean("today_widget_weather", true))
+    }
+    var showBatteryWidget by remember {
+        mutableStateOf(preferences.getBoolean("today_widget_battery", true))
+    }
+    var showSuggestionsWidget by remember {
+        mutableStateOf(preferences.getBoolean("today_widget_suggestions", true))
+    }
+    var showWidgetEditor by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -96,8 +121,26 @@ fun IOSTodayWidgetsView(
             )
         }
 
-        // Widget 1: Calendar / Up Next
-        TodayWidgetCard(title = "UP NEXT", icon = Icons.Default.CalendarToday, iconColor = Color(0xFFFF3B30)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Text(
+                text = "Edit Widgets",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { showWidgetEditor = true }
+                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                    .testTag("today_edit_widgets_button")
+            )
+        }
+
+        if (showCalendarWidget) {
+            // Widget 1: Calendar / Up Next
+            TodayWidgetCard(title = "UP NEXT", icon = Icons.Default.CalendarToday, iconColor = Color(0xFFFF3B30)) {
             Column {
                 Text(
                     text = "Calendar integration not configured",
@@ -113,8 +156,11 @@ fun IOSTodayWidgetsView(
             }
         }
 
-        // Widget 2: Weather
-        TodayWidgetCard(title = "WEATHER", icon = Icons.Default.WbSunny, iconColor = Color(0xFFFF9500)) {
+        }
+
+        if (showWeatherWidget) {
+            // Widget 2: Weather
+            TodayWidgetCard(title = "WEATHER", icon = Icons.Default.WbSunny, iconColor = Color(0xFFFF9500)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -148,8 +194,11 @@ fun IOSTodayWidgetsView(
             }
         }
 
-        // Widget 3: Batteries
-        TodayWidgetCard(title = "BATTERIES", icon = Icons.Default.PhoneIphone, iconColor = Color(0xFF4CD964)) {
+        }
+
+        if (showBatteryWidget) {
+            // Widget 3: Batteries
+            TodayWidgetCard(title = "BATTERIES", icon = Icons.Default.PhoneIphone, iconColor = Color(0xFF4CD964)) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // iPhone battery
                 Row(
@@ -256,8 +305,10 @@ fun IOSTodayWidgetsView(
             }
         }
 
+        }
+
         // Widget 4: Siri App Suggestions
-        if (recentApps.isNotEmpty()) {
+        if (showSuggestionsWidget && recentApps.isNotEmpty()) {
             TodayWidgetCard(title = "SIRI APP SUGGESTIONS", icon = Icons.Default.Search, iconColor = Color(0xFF5856D6)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -279,6 +330,55 @@ fun IOSTodayWidgetsView(
         Spacer(modifier = Modifier.height(16.dp))
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+
+    if (showWidgetEditor) {
+        AlertDialog(
+            onDismissRequest = { showWidgetEditor = false },
+            title = { Text("Customize Today View", fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    WidgetPreferenceRow("Calendar", showCalendarWidget) {
+                        showCalendarWidget = it
+                        preferences.edit().putBoolean("today_widget_calendar", it).apply()
+                    }
+                    WidgetPreferenceRow("Weather", showWeatherWidget) {
+                        showWeatherWidget = it
+                        preferences.edit().putBoolean("today_widget_weather", it).apply()
+                    }
+                    WidgetPreferenceRow("Batteries", showBatteryWidget) {
+                        showBatteryWidget = it
+                        preferences.edit().putBoolean("today_widget_battery", it).apply()
+                    }
+                    WidgetPreferenceRow("App suggestions", showSuggestionsWidget) {
+                        showSuggestionsWidget = it
+                        preferences.edit().putBoolean("today_widget_suggestions", it).apply()
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWidgetEditor = false }) {
+                    Text("Done")
+                }
+            },
+            containerColor = Color(0xF2FFFFFF)
+        )
+    }
+}
+
+@Composable
+private fun WidgetPreferenceRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = Color.Black, fontSize = 14.sp)
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
