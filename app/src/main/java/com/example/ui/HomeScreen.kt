@@ -58,6 +58,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.example.model.ActiveOverlay
 import com.example.model.AppItem
 import com.example.ui.components.AppSwitcherSheet
@@ -97,6 +99,10 @@ fun HomeScreen(
     val assistiveTouchEnabled by viewModel.assistiveTouchEnabled.collectAsState()
     val showIOSStatusBar by viewModel.showIOSStatusBar.collectAsState()
     val selectedWallpaperResId by viewModel.selectedWallpaperResId.collectAsState()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.controlsManager.syncVolume()
+        viewModel.controlsManager.syncSystemStates()
+    }
 
     // Clock hand angles for real-time ticking clock icon
     val secondAngle by viewModel.statusMonitor.secondAngle.collectAsState()
